@@ -335,9 +335,9 @@ function Lab() {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className="h-full w-full flex items-center">
+    <div className="h-full flex items-center">
       <div className="ml-[max(24px,6vw)] mr-[max(24px,6vw)] w-full">
-        <div className="max-w-245">
+        <div className="max-w-200">
           <div className="text-white/55 text-xs tracking-[0.35em] uppercase">LAB / DIRECTIONS</div>
 
           <div className="space-y-5">
@@ -413,7 +413,7 @@ function Lab() {
 
 function Form() {
   return (
-    <div className="h-full w-full flex items-center">
+    <div className="ml-[max(24px,6vw)] mr-[max(24px,6vw)] flex items-center w-200">
       <FeedbackForm />
     </div>
   )

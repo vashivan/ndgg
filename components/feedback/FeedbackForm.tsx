@@ -70,7 +70,7 @@ export default function FeedbackForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="w-full px-10">
+    <form onSubmit={onSubmit} className="w-full">
       <div className="text-white/55 text-xs tracking-[0.35em] uppercase">
         feedback / contact
       </div>
