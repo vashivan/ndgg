@@ -83,7 +83,7 @@ export default function FeedbackForm() {
           <input
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            className="w-full border-b border-white/10 bg-white/3 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition"
+            className="w-full border-b border-white/10 bg-white/8 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition"
             placeholder="NAME"
             autoComplete="name"
           />
@@ -96,7 +96,7 @@ export default function FeedbackForm() {
           <input
             value={form.contact}
             onChange={(e) => setForm((p) => ({ ...p, contact: e.target.value }))}
-            className="w-full border-b border-white/10 bg-white/3 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition"
+            className="w-full border-b border-white/10 bg-white/8 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition"
             placeholder="email or @handle"
             autoComplete="email"
           />
@@ -110,7 +110,7 @@ export default function FeedbackForm() {
         <textarea
           value={form.message}
           onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))}
-          className="min-h-35 w-full border-b border-white/10 bg-white/3 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition resize-none"
+          className="min-h-35 w-full border-b border-white/10 bg-white/8 px-4 py-3 text-white/90 outline-none focus:border-white/25 transition resize-none"
           placeholder="What do you need built? What’s the pressure?"
         />
       </label>
@@ -132,7 +132,7 @@ export default function FeedbackForm() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-2xl px-5 py-3 border border-white/10 bg-white/3 hover:border-white/25 transition disabled:opacity-40 disabled:hover:border-white/10"
+          className="px-5 py-3 bg-white/3 hover:border-white/25 transition disabled:opacity-40 disabled:hover:border-white/10"
         >
           <span className="text-[12px] tracking-[0.28em] uppercase text-white/85">
             send<span style={{ color: ACID }}> →</span>
