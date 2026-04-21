@@ -1,465 +1,364 @@
-// app/page.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import SiteFooter from "@/components/footer/SiteFooter";
 import FeedbackForm from "@/components/feedback/FeedbackForm";
+import Link from "next/link";
+import { link } from "fs";
 
 const ACID = "#FF1E1E";
 
-/* ----------------------------- utils ----------------------------- */
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-function useActiveSection<const T extends readonly string[]>(sectionIds: T) {
-  type Id = T[number];
-
-  const [active, setActive] = useState<Id>(sectionIds[0]);
-
-  const refs = useMemo(() => {
-    const map = new Map<Id, React.RefObject<HTMLElement | null>>();
-    sectionIds.forEach((id) => {
-      map.set(id, { current: null });
-    });
-    return map;
-  }, [sectionIds]);
-
-  useEffect(() => {
-    const els = sectionIds
-      .map((id) => refs.get(id)?.current)
-      .filter((el): el is HTMLElement => el instanceof HTMLElement);
-
-    if (!els.length) return;
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        const best = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0))[0];
-
-        const id = best?.target?.getAttribute("data-section");
-        if (id && sectionIds.includes(id as Id)) setActive(id as Id);
-      },
-      { threshold: [0.25, 0.5, 0.75] }
-    );
-
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [refs, sectionIds]);
-
-  return { active, refs };
-}
-
-/* ------------------------- custom cursor ------------------------- */
-
-function NDGGCursor() {
-  const dotRef = useRef<HTMLDivElement | null>(null);
-  const ringRef = useRef<HTMLDivElement | null>(null);
-
-  const mouse = useRef({ x: 0, y: 0 });
-  const ring = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const finePointer = window.matchMedia("(pointer: fine)").matches;
-    if (!finePointer) return;
-
-    // hide native cursor via class (add CSS in globals if you want, but we can do minimal inline)
-    document.documentElement.classList.add("ndgg-cursor");
-
-    const onMove = (e: MouseEvent) => {
-      mouse.current.x = e.clientX;
-      mouse.current.y = e.clientY;
-      document.documentElement.classList.add("ndgg-cursor--active");
-    };
-    const onLeave = () => document.documentElement.classList.remove("ndgg-cursor--active");
-    const onDown = () => document.documentElement.classList.add("ndgg-cursor--down");
-    const onUp = () => document.documentElement.classList.remove("ndgg-cursor--down");
-
-    window.addEventListener("mousemove", onMove, { passive: true });
-    window.addEventListener("mouseleave", onLeave);
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("mouseup", onUp);
-
-    let raf = 0;
-    const tick = () => {
-      const dot = dotRef.current;
-      const ringEl = ringRef.current;
-
-      if (dot) {
-        dot.style.transform = `translate(${mouse.current.x}px, ${mouse.current.y}px)`;
-      }
-      if (ringEl) {
-        ring.current.x = lerp(ring.current.x, mouse.current.x, 0.14);
-        ring.current.y = lerp(ring.current.y, mouse.current.y, 0.14);
-        ringEl.style.transform = `translate(${ring.current.x}px, ${ring.current.y}px)`;
-      }
-
-      raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseleave", onLeave);
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mouseup", onUp);
-
-      document.documentElement.classList.remove("ndgg-cursor");
-      document.documentElement.classList.remove("ndgg-cursor--active");
-      document.documentElement.classList.remove("ndgg-cursor--down");
-    };
-  }, []);
-
-  // minimal styles inline, але щоб "cursor:none" спрацював — додай CSS знизу (я дав після коду)
-  return (
-    <>
-      <div
-        ref={ringRef}
-        className="ndgg-cursor-ring"
-        aria-hidden
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          width: 36,
-          height: 36,
-          borderRadius: 999,
-          transform: "translate(-50%, -50%)",
-          pointerEvents: "none",
-          zIndex: 9998,
-          border: "1px solid rgba(255,255,255,0.18)",
-          backdropFilter: "blur(2px)",
-          willChange: "transform, opacity",
-        }}
-      />
-      <div
-        ref={dotRef}
-        className="ndgg-cursor-dot"
-        aria-hidden
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          width: 8,
-          height: 8,
-          borderRadius: 999,
-          transform: "translate(-50%, -50%)",
-          pointerEvents: "none",
-          zIndex: 9999,
-          backgroundColor: ACID,
-          boxShadow: "0 0 18px rgba(255,30,30,0.35)",
-          willChange: "transform, opacity",
-        }}
-      />
-      {/* simple class-driven visibility */}
-      <style>{`
-        @media (pointer: fine) {
-          html.ndgg-cursor, html.ndgg-cursor * { cursor: none !important; }
-        }
-        html.ndgg-cursor--active .ndgg-cursor-dot,
-        html.ndgg-cursor--active .ndgg-cursor-ring { opacity: 1; }
-        html.ndgg-cursor--down .ndgg-cursor-ring { width: 28px; height: 28px; }
-      `}</style>
-    </>
-  );
-}
-
-/* --------------------------- UI blocks --------------------------- */
-
-function ScrollHint({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="absolute bottom-10 right-10 flex items-center gap-3 select-none"
-      aria-label="Scroll to next section"
-    >
-      <span className="text-white/45 text-xs tracking-[0.25em] uppercase">scroll</span>
-      <span style={{ color: ACID }} className="text-lg leading-none">
-        ↓
-      </span>
-    </button>
-  );
-}
-
-
-function Hero({ onScrollNext }: { onScrollNext: () => void }) {
-  const prefersReduced = useReducedMotion();
-
-  return (
-    <div className="h-svh w-full overflow-y-auto snap-y snap-mandatory scroll-smooth overscroll-contain">
-      <div className="h-full flex items-center">
-        <div className="ml-[max(24px,6vw)]">
-          <motion.h1
-            className="font-semibold text-white leading-[0.95] tracking-[-0.03em]"
-            style={{ fontSize: "clamp(44px, 7vw, 96px)" }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              transition: { duration: prefersReduced ? 0 : 0.35, delay: prefersReduced ? 0 : 0.15 },
-            }}
-          >
-            NOT DONE<span style={{ color: ACID }}>.</span>
-          </motion.h1>
-
-          <motion.h2
-            className="font-extrabold text-white leading-[0.95] tracking-[-0.03em] mt-3"
-            style={{ fontSize: "clamp(44px, 7vw, 104px)" }}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              transition: { duration: prefersReduced ? 0 : 0.35, delay: prefersReduced ? 0 : 0.32 },
-            }}
-          >
-            GO FURTHER<span style={{ color: ACID }}>.</span>
-          </motion.h2>
-
-          <motion.div
-            className="mt-6 h-px w-[min(520px,70vw)] bg-white/10"
-            initial={{ scaleX: 0, transformOrigin: "left" }}
-            animate={{
-              scaleX: 1,
-              transition: { duration: prefersReduced ? 0 : 0.45, delay: prefersReduced ? 0 : 0.45 },
-            }}
-          />
-          <motion.div
-            className="mt-2 h-px w-[min(380px,55vw)]"
-            style={{ backgroundColor: ACID }}
-            initial={{ scaleX: 0, transformOrigin: "left" }}
-            animate={{
-              scaleX: 1,
-              transition: { duration: prefersReduced ? 0 : 0.45, delay: prefersReduced ? 0 : 0.55 },
-            }}
-          />
-        </div>
-      </div>
-
-      <ScrollHint onClick={onScrollNext} />
-
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.18]"
-        style={{
-          background:
-            "radial-gradient(1200px 600px at 10% 40%, rgba(255,255,255,0.08), transparent 60%), radial-gradient(900px 500px at 90% 70%, rgba(255,30,30,0.06), transparent 65%)",
-        }}
-      />
-    </div>
-  );
-}
-
-function Manifest() {
-  const prefersReduced = useReducedMotion();
-
-  const lines = [
-    { a: "WE DON’T FINISH.", b: "WE MOVE FORWARD." },
-    { a: "PROGRESS IS UGLY.", b: "THAT’S WHY IT’S REAL." },
-    { a: "NOT DONE IS THE STATE.", b: "FINISHING IS A LIE." },
-  ];
-
-  return (
-    <div className="h-full w-full flex items-center">
-      <div className="ml-[max(24px,6vw)] mr-[max(24px,6vw)] w-full">
-        <div className="max-w-230">
-          {lines.map((pair, i) => (
-            <motion.div
-              key={pair.a}
-              className="py-10"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.55 }}
-              transition={{ duration: prefersReduced ? 0 : 0.35, delay: prefersReduced ? 0 : i * 0.05 }}
-            >
-              <div className="text-white font-bold tracking-[-0.02em]" style={{ fontSize: "clamp(26px, 3.2vw, 44px)" }}>
-                {pair.a}
-              </div>
-
-              <div className="mt-4 flex items-center gap-4">
-                <div className="h-px w-10 bg-white/15" />
-                <div className="h-px w-16" style={{ backgroundColor: ACID }} />
-              </div>
-
-              <div className="mt-4 text-white/90 font-bold tracking-[-0.02em]" style={{ fontSize: "clamp(26px, 3.2vw, 44px)" }}>
-                {pair.b}
-              </div>
-
-              {i === 0 && (
-                <div className="mt-6 text-white/35 text-xs tracking-[0.35em] uppercase">(keep going)</div>
-              )}
-            </motion.div>
-          ))}
-
-          <motion.div
-            className="text-white/55 text-sm tracking-[0.25em] uppercase"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: false, amount: 0.6 }}
-            transition={{ duration: prefersReduced ? 0 : 0.3 }}
-          >
-            <span className="relative">
-              finishing
-              <span
-                className="absolute left-0 right-0 top-1/2 h-0.5"
-                style={{ backgroundColor: ACID, transform: "translateY(-50%) rotate(-2deg)" }}
-              />
-            </span>{" "}
-            is convenient.
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const directions = [
-  { title: "BRAND", hint: "pressure identity", items: ["strategy", "identity", "systems", "naming"] },
-  { title: "DIGITAL", hint: "interfaces that bite", items: ["web", "product", "motion", "conversion"] },
-  { title: "SYSTEMS", hint: "structure over vibes", items: ["process", "automation", "ops", "documentation"] },
-  { title: "AI", hint: "useful, not cute", items: ["agents", "workflows", "assistants", "integrations"] },
-  { title: "EXPERIMENTS", hint: "unfinished on purpose", items: ["prototypes", "tests", "fragments", "research"] },
+const services = [
+  {
+    number: "01",
+    title: "Web Design & Development",
+    text: "Створюємо нові сайти або переосмислюємо існуючі: структура, дизайн, верстка, анімація, запуск.",
+  },
+  {
+    number: "02",
+    title: "Brand Presence",
+    text: "Допомагаємо бренду виглядати цілісно: візуальна подача, тексти, позиціонування, цифровий образ.",
+  },
+  {
+    number: "03",
+    title: "Portfolio & Case Presentation",
+    text: "Оформлюємо проєкти так, щоб вони не просто існували, а переконували: кейси, сторінки, подача результату.",
+  },
+  {
+    number: "04",
+    title: "Digital Systems",
+    text: "Підключаємо форми, автоматизації, CRM-логіку, AI-інструменти й інші робочі механіки під бізнес-задачі.",
+  },
 ];
 
-function Lab() {
-  const prefersReduced = useReducedMotion();
-  const [open, setOpen] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
+const projects = [
+  {
+    name: "FORM",
+    type: "E-commerce / Brand site",
+    description:
+      "Оновлення структури й подачі бренду танцювального одягу: каталог, сторінки товарів, візуальна система, сучасніший UX.",
+    tags: ["Next.js", "Tailwind", "E-commerce", "MySQL", "Prisma"],
+    link: "https://formdance.space/"
+  },
+  {
+    name: "CASTPOINT",
+    type: "Platform / Product presentation",
+    description:
+      "Платформа для артистів і роботодавців. Пропрацювання логіки вакансій, заявок, PDF-подачі кандидатів і загального цифрового образу сервісу.",
+    tags: ["Platform", "UX", "Automation", "Brand", "Visual concept"],
+    link: "https://castpoint.art"
+  },
+  {
+    name: "Seoul memo",
+    type: "Concept store / Storytelling",
+    description:
+      "Емоційний e-commerce-проєкт із сильним mood-driven підходом. Акцент на атмосфері, історії продукту та відчутті бренду.",
+    tags: ["Storytelling", "Brand", "Visual concept", "Neon", "PostgreSQL"],
+    link: "https://seoul-memo.vercel.app"
+  },
+   {
+    name: "Lavanda Studio",
+    type: "E-commerce / Storytelling",
+    description:
+      "Проект для аналізу та запису клієнтів студії. Акцент на візуальній подачі та зручності використання, автоматизації процесів без участі менеджера.",
+    tags: ["Storytelling", "Brand", "Visual concept", "Neon", "MySQL"],
+    link: "https://lavanda-studio.ua"
+  }
+];
 
+const steps = [
+  "Аналізуємо, як зараз виглядає ваш сайт або ідея.",
+  "Пропонуємо нову структуру й подачу під ваш продукт.",
+  "Збираємо дизайн і front-end реалізацію.",
+  "Додаємо проєкти, контент, форми та потрібні інтеграції.",
+];
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full flex items-center">
-      <div className="ml-[max(24px,6vw)] mr-[max(24px,6vw)] w-full">
-        <div className="max-w-200">
-          <div className="text-white/55 text-xs tracking-[0.35em] uppercase">LAB / DIRECTIONS</div>
-
-          <div className="space-y-5">
-            {directions.map((d) => {
-              const isOpen = open === d.title;
-              const isHover = hovered === d.title;
-
-              return (
-                <div key={d.title} className="border-t border-white/10 pt-5">
-                  <button
-                    type="button"
-                    onClick={() => setOpen((prev) => (prev === d.title ? null : d.title))}
-                    onMouseEnter={() => setHovered(d.title)}
-                    onMouseLeave={() => setHovered(null)}
-                    className="w-full text-left flex items-baseline justify-between gap-6 group select-none"
-                  >
-                    <motion.div
-                      className="text-white font-extrabold tracking-[-0.03em]"
-                      style={{ fontSize: "clamp(28px, 4vw, 56px)" }}
-                      animate={prefersReduced ? {} : { x: isHover ? 4 : 0 }}
-                      transition={{ duration: 0.18 }}
-                    >
-                      {d.title}
-                    </motion.div>
-
-                    <motion.div
-                      className="font-bold tracking-[-0.02em]"
-                      animate={prefersReduced ? {} : { x: isHover ? 6 : 0 }}
-                      transition={{ duration: 0.18 }}
-                      style={{ color: ACID, fontSize: "clamp(22px, 3vw, 44px)" }}
-                      aria-hidden
-                    >
-                      →
-                    </motion.div>
-                  </button>
-
-                  <motion.div
-                    initial={false}
-                    animate={isOpen ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
-                    transition={{ duration: prefersReduced ? 0 : 0.25 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pt-4 pb-2">
-                      <div
-                        className={cx(
-                          "mb-5 text-white/35 text-xs tracking-[0.35em] uppercase transition-opacity opacity-100"
-                        )}
-                      >
-                        ({d.hint})
-                      </div>
-                      <div className="flex flex-col flex-wrap gap-x-10 gap-y-2">
-                        {d.items.map((it) => (
-                          <div key={it} className="text-white/80 text-sm tracking-[0.18em] uppercase">
-                            {it}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* <div className="mt-10 text-white/30 text-xs tracking-[0.35em] uppercase">
-            menu appears here. not earlier.
-          </div> */}
-        </div>
-      </div>
+    <div className="mb-6 text-[11px] uppercase tracking-[0.35em] text-white/45">
+      {children}
     </div>
   );
 }
 
-function Form() {
-  return (
-    <div className="ml-[max(24px,6vw)] mr-[max(24px,6vw)] flex items-center w-200">
-      <FeedbackForm />
-    </div>
-  )
+function Container({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`mx-auto w-full max-w-7xl px-6 md:px-10 ${className}`}>{children}</div>;
 }
 
-/* ----------------------------- page ------------------------------ */
-
-export default function Page() {
-  const sectionIds = ["hero", "manifest", "lab", "form", "footer"] as const;
-  type SectionId = (typeof sectionIds)[number];
-
-  const { refs } = useActiveSection(sectionIds);
-
-  // const [menuOpen, setMenuOpen] = useState(false);
-
-  const scrollTo = (id: SectionId) => {
-    const el = refs.get(id)?.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+function Hero() {
+  const reduce = useReducedMotion();
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <NDGGCursor />
+    <section className="relative overflow-hidden border-b border-white/10">
+      <Container className="py-24 md:py-32">
+        <div className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+          <div>
+            <motion.div
+              initial={{ opacity: 0, y: reduce ? 0 : 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.45 }}
+              className="mb-5 inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-white/50"
+            >
+              <span className="h-px w-10 bg-white/20" />
+              NDGG / Product & Brand Presence
+            </motion.div>
 
-      <div className="h-screen w-full overflow-y-auto snap-y snap-mandatory scroll-smooth">
-        <section ref={refs.get("hero")} data-section="hero" className="h-svh snap-start snap-always relative">
-          <Hero onScrollNext={() => scrollTo("manifest")} />
-        </section>
+            <motion.h1
+              initial={{ opacity: 0, y: reduce ? 0 : 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.55, delay: reduce ? 0 : 0.08 }}
+              className="max-w-5xl text-5xl font-semibold leading-[0.92] tracking-[-0.05em] text-white md:text-7xl xl:text-[92px]"
+            >
+              We redesign websites so brands look clear, strong and worth choosing
+              <span style={{ color: ACID }}>.</span>
+            </motion.h1>
 
-        <section ref={refs.get("manifest")} data-section="manifest" className="h-svh snap-start snap-always relative">
-          <Manifest />
-        </section>
+            <motion.p
+              initial={{ opacity: 0, y: reduce ? 0 : 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.45, delay: reduce ? 0 : 0.16 }}
+              className="mt-8 max-w-2xl text-justify leading-7 text-white/72 md:text-lg"
+            >
+              Збираємо нові сторінки, переробляємо існуючі сайти й оформлюємо проєкти так,
+              щоб сайт став не просто візиткою, а сильною подачею бренду, компанії або студії.
+            </motion.p>
 
-        <section ref={refs.get("lab")} data-section="lab" className="h-svh snap-start snap-always relative">
-          <Lab />
-        </section>
+            <motion.div
+              initial={{ opacity: 0, y: reduce ? 0 : 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.4, delay: reduce ? 0 : 0.24 }}
+              className="mt-10 flex flex-wrap gap-4"
+            >
+              <a
+                href="#projects"
+                className="inline-flex items-center justify-center border border-transparent px-6 py-3 text-sm font-medium text-black transition-transform duration-200 hover:color-white"
+                style={{ backgroundColor: ACID }}
+              >
+                View projects
+              </a>
+              <a
+                href="#contact"
+                className="inline-flex items-center justify-center border border-white/15 px-6 py-3 text-sm font-medium text-white/88 transition-colors duration-200 hover:border-white/30 hover:text-white"
+              >
+                Discuss a project
+              </a>
+            </motion.div>
+          </div>
 
-        <section ref={refs.get("form")} data-section="form" className="h-svh snap-start snap-always relative flex">
-          <Form />
-        </section>
+          <motion.div
+            initial={{ opacity: 0, y: reduce ? 0 : 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? 0 : 0.55, delay: reduce ? 0 : 0.18 }}
+          >
+            <div className="text-[11px] uppercase tracking-[0.3em] text-white/40">What we do</div>
+            <div className="mt-6 space-y-5">
+              {[
+                "Build new pages",
+                "Redesign existing websites",
+                "Add company / studio presentation",
+                "Showcase selected projects and portfolio",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-4 border-b border-white/8 pb-4 last:border-b-0 last:pb-0">
+                  <div className="mt-1 h-2 w-2 rounded-full" style={{ backgroundColor: ACID }} />
+                  <p className="text-sm uppercase tracking-[0.18em] text-white/78">{item}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </Container>
 
-        <section ref={refs.get("footer")} data-section="footer"  className="h-svh snap-start snap-always relative flex items-center">
-          <SiteFooter />
-        </section>
-      </div>
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70"
+        style={{
+          background:
+            "radial-gradient(900px 500px at 15% 10%, rgba(255,255,255,0.08), transparent 60%), radial-gradient(700px 420px at 85% 70%, rgba(255,30,30,0.10), transparent 60%)",
+        }}
+      />
+    </section>
+  );
+}
+
+function About() {
+  return (
+    <section id="about" className="border-b border-white/10 py-20 md:py-28">
+      <Container>
+        <SectionLabel>About</SectionLabel>
+        <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+          <div>
+            <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-white md:text-5xl">
+              Not just a beautiful screen — a clearer digital presence.
+            </h2>
+          </div>
+
+          <div className="space-y-6 text-justify leading-8 text-white/72">
+            <p>
+              Ми працюємо на перетині сайту, бренду й подачі. Якщо у вас уже є проєкт,
+              але він виглядає застаріло, нечітко або не показує вашу цінність — ми це
+              перезбираємо.
+            </p>
+            <p>
+              Якщо потрібно, додаємо нові сторінки: про компанію, послуги, кейси,
+              портфоліо, форми зворотного зв’язку, логіку заявок та інші елементи,
+              які роблять сайт живим і переконливим.
+            </p>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function Services() {
+  return (
+    <section id="services" className="border-b border-white/10 py-20 md:py-28">
+      <Container>
+        <SectionLabel>Services</SectionLabel>
+        <div className="grid gap-5 md:grid-cols-2">
+          {services.map((service) => (
+            <motion.article
+              key={service.title}
+              transition={{ duration: 0.18 }}
+              className="border border-white/10 bg-white/[0.02] p-6 md:p-8"
+            >
+              <div className="text-xs uppercase tracking-[0.32em] text-white/35">{service.number}</div>
+              <h3 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-white">
+                {service.title}
+              </h3>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-white/70 md:text-base">
+                {service.text}
+              </p>
+            </motion.article>
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function Projects() {
+  return (
+    <section id="projects" className="border-b border-white/10 py-20 md:py-28">
+      <Container>
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <SectionLabel>Selected projects</SectionLabel>
+            <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white md:text-5xl">
+              We add your projects to the site so people can see what stands behind the words.
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-7 text-white/58 md:text-base">
+            Портфоліо — це не додаток “десь внизу”. Це доказ вашого рівня, стилю й підходу.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {projects.map((project) => (
+            <article
+              key={project.name}
+              className="border border-white/10 group bg-white/3 p-6 mb-5 transition-colors duration-200 hover:border-white/30"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="text-2xl font-semibold tracking-[-0.03em] text-white">
+                  <Link
+                    className="underline"
+                    href={project.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {project.name}
+                  </Link>
+                </h3>
+                <span className="text-[11px] uppercase tracking-[0.24em] text-white/35">Project</span>
+              </div>
+              <div className="mt-3 text-sm uppercase tracking-[0.18em]" style={{ color: ACID }}>
+                {project.type}
+              </div>
+              <p className="mt-5 text-sm leading-7 text-white/70 md:text-base">
+                {project.description}
+              </p>
+              <div className="mt-8 flex flex-wrap gap-2">
+                {project.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/55"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function Process() {
+  return (
+    <section className="border-b border-white/10 py-20 md:py-28">
+      <Container>
+        <SectionLabel>Process</SectionLabel>
+        <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr]">
+          <div>
+            <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-white md:text-5xl">
+              From messy site to structured presentation.
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {steps.map((step, index) => (
+              <div key={step} className="flex gap-5 border border-white/10 px-5 py-5 md:px-6">
+                <div className="text-sm font-medium tracking-[0.22em] text-white/35">
+                  0{index + 1}
+                </div>
+                <p className="text-sm leading-7 text-white/75 md:text-base">{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function Contact() {
+  return (
+    <section id="contact" className="py-20 md:py-28">
+      <Container>
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div>
+            <SectionLabel>Contact</SectionLabel>
+            <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-white md:text-5xl">
+              Need a new page, a cleaner site, or a proper portfolio section?
+            </h2>
+            <p className="mt-6 max-w-xl text-base leading-8 text-white/68">
+              Напиши коротко про свій сайт або ідею — і ми подивимось, як це можна
+              перетворити на сильнішу й сучаснішу подачу.
+            </p>
+          </div>
+
+          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-4 md:p-6">
+            <FeedbackForm />
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+export default function Page() {
+  return (
+    <main className="min-h-screen text-white">
+      <Hero />
+      <About />
+      <Services />
+      <Projects />
+      <Process />
+      <Contact />
+      <SiteFooter />
     </main>
   );
 }
