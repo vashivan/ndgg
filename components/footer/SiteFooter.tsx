@@ -5,7 +5,7 @@ const ACID = "#FF1E1E";
 export default function SiteFooter() {
   return (
     <footer>
-      <div className="px-[max(24px,6vw)] py-14">
+      <div className="px-10 md:px-30 py-14">
         <div className="max-w-275">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_560px] gap-10 items-start">
             <div>

@@ -90,8 +90,8 @@ function Hero() {
   const reduce = useReducedMotion();
 
   return (
-    <section className="relative overflow-hidden border-b border-white/10">
-      <Container className="py-24 md:py-32">
+    <section className="relative overflow-hidden">
+      <Container className="py-10 md:py-10">
         <div className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
             <motion.div
@@ -182,7 +182,7 @@ function Hero() {
 
 function About() {
   return (
-    <section id="about" className="border-b border-white/10 py-20 md:py-28">
+    <section id="about" className="py-20 md:py-28">
       <Container>
         <SectionLabel>About</SectionLabel>
         <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
@@ -212,7 +212,7 @@ function About() {
 
 function Services() {
   return (
-    <section id="services" className="border-b border-white/10 py-20 md:py-28">
+    <section id="services" className="py-20 md:py-28">
       <Container>
         <SectionLabel>Services</SectionLabel>
         <div className="grid gap-5 md:grid-cols-2">
@@ -239,7 +239,7 @@ function Services() {
 
 function Projects() {
   return (
-    <section id="projects" className="border-b border-white/10 py-20 md:py-28">
+    <section id="projects" className=" py-20 md:py-28">
       <Container>
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
@@ -248,9 +248,6 @@ function Projects() {
               We add your projects to the site so people can see what stands behind the words.
             </h2>
           </div>
-          <p className="max-w-md text-sm leading-7 text-white/58 md:text-base">
-            Портфоліо — це не додаток “десь внизу”. Це доказ вашого рівня, стилю й підходу.
-          </p>
         </div>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
@@ -298,7 +295,7 @@ function Projects() {
 
 function Process() {
   return (
-    <section className="border-b border-white/10 py-20 md:py-28">
+    <section className="py-20 md:py-28">
       <Container>
         <SectionLabel>Process</SectionLabel>
         <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr]">
