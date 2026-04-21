@@ -340,7 +340,7 @@ function Contact() {
             </p>
           </div>
 
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-4 md:p-6">
+          <div className="border-white/10 bg-white/[0.03] p-4 md:p-6">
             <FeedbackForm />
           </div>
         </div>
